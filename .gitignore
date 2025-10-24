@@ -1,0 +1,14 @@
+# Ignore data and binary files
+
+**.h5
+**.npz
+**.root
+**.pk1
+
+# Ignore tmp and results folders
+
+*.log
+**/tmp/
+**/results/
+__pycache__/
+.ipynb_checkpoints/
