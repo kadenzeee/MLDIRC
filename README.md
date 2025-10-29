@@ -11,3 +11,16 @@ MLDIRC is a series of machine learning experiments built on simulated data of th
 - prttools (https://github.com/rdom/prttools)
 
 ## ----------------------------
+
+## --- GSI Software Install ---
+
+    #!/bin/bash
+    git clone https://github.com/rdom/prtdirc
+    git clone https://github.com/rdom/prttools
+
+    cd prtdirc
+    mkdir build
+    cd build
+    cmake ..
+    make
+## ----------------------------
