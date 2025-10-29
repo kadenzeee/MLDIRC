@@ -5,10 +5,9 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as plticker
 
 
-
 program_start = time.time()
 
-infile = "GaussianTime/BinaryOccupancy/80DEG.npz"
+infile = "80DEG.npz"
 
 with np.load(infile) as f:
     TIMES, LABELS = f["TIMES"], f["LABELS"]
@@ -57,7 +56,7 @@ print(f'Training on {trainend} events')
 input_dim = TIMES.shape[1]
 print(f'Input dimension: {input_dim}')
 
-search = 64
+search = 5
 heatmap = np.zeros((search, search))
 sizes = np.zeros((search, search))
 
