@@ -1,5 +1,6 @@
 import sys
-import ROOT
+
+import ROOT  # type: ignore ::: need to be in environment with ROOT installed and sourced
 import numpy as np
 import time
 
