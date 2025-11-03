@@ -7,7 +7,7 @@ import matplotlib.ticker as plticker
 
 program_start = time.time()
 
-infile = "80DEG.npz"
+infile = "80DEGlead.npz"
 
 with np.load(infile) as f:
     TIMES, LABELS = f["TIMES"], f["LABELS"]
@@ -56,9 +56,10 @@ print(f'Training on {trainend} events')
 input_dim = TIMES.shape[1]
 print(f'Input dimension: {input_dim}')
 
-search = 5
-heatmap = np.zeros((search, search))
-sizes = np.zeros((search, search))
+search = (64,64)
+heatmap = np.zeros((search[0], search[-1]))
+sizes = np.zeros((search[0], search[-1]))
+ztest = np.zeros((search[0], search[-1]))
 
 for i in range(0, search):
     for j in range(0, search):
@@ -75,10 +76,28 @@ for i in range(0, search):
         model.compile(optimizer='adam',
             loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
             metrics=['accuracy'])
+        
+        history = model.fit(train_ds, validation_data=val_ds, epochs=nepochs)
+        history_dict = history.history
 
-        model.fit(train_ds, validation_data=val_ds, epochs=nepochs)
+        
+
+        
 
         test_loss, test_acc = model.evaluate(test_ds, verbose=2)
+
+        p_train = history_dict['binary_accuracy'][-1]
+        p_test  = test_acc
+
+        n_train = len(train_ds)
+        n_test  = len(test_ds)
+
+        # standard errors
+        sigma_train = np.sqrt(p_train * (1 - p_train) / n_train)
+        sigma_test  = np.sqrt(p_test * (1 - p_test) / n_test)
+
+        z = (p_train - p_test) / np.sqrt(sigma_train**2 + sigma_test**2)
+
         heatmap[i, j] = test_acc
         sizes[i, j] = modelsize
 
@@ -91,7 +110,8 @@ map = ax.pcolor(heatmap, vmin=0.5, vmax=1)
 ax.set_xlabel('Number of Nodes')
 ax.set_ylabel('Number of Layers')
 
-loc = plticker.MultipleLocator(base=1, offset=0.5); ax.xaxis.set_major_locator(loc); ax.yaxis.set_major_locator(loc); 
+locx = plticker.MultipleLocator(base=1, offset=0.5); ax.xaxis.set_major_locator(locx); 
+locy = plticker.MultipleLocator(base=8, offset=-0.5); ax.yaxis.set_major_locator(locy); 
 f = lambda x, _: int(x + 0.5); ax.xaxis.set_major_formatter(plticker.FuncFormatter(f)); ax.yaxis.set_major_formatter(plticker.FuncFormatter(f))
 
 traditional_acc = 0.86
@@ -111,7 +131,8 @@ ax.set_title('Number of Parameters')
 ax.set_xlabel('Number of Nodes')
 ax.set_ylabel('Number of Layers')
 
-loc = plticker.MultipleLocator(base=1, offset=0.5); ax.xaxis.set_major_locator(loc); ax.yaxis.set_major_locator(loc); 
+locx = plticker.MultipleLocator(base=1, offset=0.5); ax.xaxis.set_major_locator(locx); 
+locy = plticker.MultipleLocator(base=8, offset=-0.5); ax.yaxis.set_major_locator(locy); 
 f = lambda x, _: int(x + 0.5); ax.xaxis.set_major_formatter(plticker.FuncFormatter(f)); ax.yaxis.set_major_formatter(plticker.FuncFormatter(f))
 
 max_acc = np.max(sizes)
@@ -119,6 +140,7 @@ max_acc = np.max(sizes)
 cbar = fig.colorbar(map, ax=ax)
 
 plt.savefig(f'modelsizes.png')
+
 
 
 print(f'Done in {program_end-program_start} s')

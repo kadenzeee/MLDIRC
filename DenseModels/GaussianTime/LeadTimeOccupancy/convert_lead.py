@@ -8,7 +8,7 @@ program_start = time.time()
 ROOT.gInterpreter.ProcessLine('#include "/u/markhoff/Documents/Simulations/prttools/PrtTools.h"')
 ROOT.gSystem.Load('/u/markhoff/Documents/Simulations/prtdirc/build/libPrt.so')
 
-infile = "GaussianTime/BinaryOccupancy/80DEG.root"
+infile = "/u/markhoff/Documents/ML/ANGULAR_DATASETS/80DEG.root"
 if(len(sys.argv) > 1):
     infile = sys.argv[1] 
 
@@ -42,8 +42,8 @@ while t.next() and t.i() < entries:
 
     i = t.i()
 
-    times = [photon.getLeadTime() + ROOT.gRandom.Gaus(0, 0.2) for photon in t.event().getHits()]
-    chs   = [int(photon.getChannel()) for photon in t.event().getHits()]
+    times = np.array([photon.getLeadTime() + ROOT.gRandom.Gaus(0, 0.2) for photon in t.event().getHits()])
+    chs   = np.array([int(photon.getChannel()) for photon in t.event().getHits()])
 
     mu    = np.mean(times)
     std   = np.std(times)
@@ -51,7 +51,7 @@ while t.next() and t.i() < entries:
     t1    = np.max(times)
 
     chind = np.zeros(nchan)
-    chind[chs] += times[chs]
+    chind[chs] += times
 
     TIMES[i]  = np.concatenate(([mu, std, t0, t1], chind))
     LABELS[i] = t.pid()/2 - 1
@@ -62,7 +62,7 @@ shuffle = np.random.permutation(entries)
 TIMES  = TIMES[shuffle]
 LABELS = LABELS[shuffle]
 
-outfile = infile.replace(".root", "")
+outfile = infile.replace(".root", "lead")
 np.savez(outfile, TIMES=TIMES, LABELS=LABELS)
 
 program_end = time.time()

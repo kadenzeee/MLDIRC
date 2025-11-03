@@ -1,10 +1,10 @@
 # Ignore data and binary files
 
-**.h5
-**.npz
-**.root
-**.pk1
-**.png
+*.h5
+*.npz
+*.root
+*.pk1
+*.png
 
 # Ignore tmp and results folders
 

@@ -91,7 +91,8 @@ map = ax.pcolor(heatmap, vmin=0.5, vmax=1)
 ax.set_xlabel('Number of Nodes')
 ax.set_ylabel('Number of Layers')
 
-loc = plticker.MultipleLocator(base=1, offset=0.5); ax.xaxis.set_major_locator(loc); ax.yaxis.set_major_locator(loc); 
+locx = plticker.MultipleLocator(base=1, offset=0.5); ax.xaxis.set_major_locator(locx); 
+locy = plticker.MultipleLocator(base=8, offset=-0.5); ax.yaxis.set_major_locator(locy); 
 f = lambda x, _: int(x + 0.5); ax.xaxis.set_major_formatter(plticker.FuncFormatter(f)); ax.yaxis.set_major_formatter(plticker.FuncFormatter(f))
 
 traditional_acc = 0.86
@@ -111,7 +112,8 @@ ax.set_title('Number of Parameters')
 ax.set_xlabel('Number of Nodes')
 ax.set_ylabel('Number of Layers')
 
-loc = plticker.MultipleLocator(base=1, offset=0.5); ax.xaxis.set_major_locator(loc); ax.yaxis.set_major_locator(loc); 
+locx = plticker.MultipleLocator(base=1, offset=0.5); ax.xaxis.set_major_locator(locx); 
+locy = plticker.MultipleLocator(base=8, offset=-0.5); ax.yaxis.set_major_locator(locy); 
 f = lambda x, _: int(x + 0.5); ax.xaxis.set_major_formatter(plticker.FuncFormatter(f)); ax.yaxis.set_major_formatter(plticker.FuncFormatter(f))
 
 max_acc = np.max(sizes)
@@ -119,6 +121,5 @@ max_acc = np.max(sizes)
 cbar = fig.colorbar(map, ax=ax)
 
 plt.savefig(f'modelsizes.png')
-
 
 print(f'Done in {program_end-program_start} s')
