@@ -56,12 +56,13 @@ print(f'Training on {trainend} events')
 input_dim = TIMES.shape[1]
 print(f'Input dimension: {input_dim}')
 
-search = 5
-heatmap = np.zeros((search, search))
-sizes = np.zeros((search, search))
+search = (64,10)
+heatmap = np.zeros((search[0], search[-1]))
+sizes = np.zeros((search[0], search[-1]))
+ztest = np.zeros((search[0], search[-1]))
 
-for i in range(0, search):
-    for j in range(0, search):
+for i in range(0, search[0]):
+    for j in range(0, search[-1]):
 
         model = tf.keras.Sequential(
             [tf.keras.layers.Flatten(input_shape=(input_dim,))] +
@@ -75,21 +76,37 @@ for i in range(0, search):
         model.compile(optimizer='adam',
             loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
             metrics=['accuracy'])
-
-        model.fit(train_ds, validation_data=val_ds, epochs=nepochs)
+        
+        history = model.fit(train_ds, validation_data=val_ds, epochs=nepochs)
+        history_dict = history.history
 
         test_loss, test_acc = model.evaluate(test_ds, verbose=2)
+
+        p_train = history_dict['accuracy'][-1]
+        p_test  = test_acc
+
+        n_train = len(train_ds)
+        n_test  = len(test_ds)
+
+        # standard errors
+        sigma_train = np.sqrt(p_train * (1 - p_train) / n_train)
+        sigma_test  = np.sqrt(p_test * (1 - p_test) / n_test)
+
+        z = (p_train - p_test) / np.sqrt(sigma_train**2 + sigma_test**2)
+
         heatmap[i, j] = test_acc
         sizes[i, j] = modelsize
+        ztest[i, j] = z
 
 program_end = time.time()
 
 print(heatmap)
 print(sizes)
+print(ztest)
 fig, ax = plt.subplots(figsize=(10,7))
 map = ax.pcolor(heatmap, vmin=0.5, vmax=1)
-ax.set_xlabel('Number of Nodes')
-ax.set_ylabel('Number of Layers')
+ax.set_xlabel('Number of Layers')
+ax.set_ylabel('Number of Nodes')
 
 locx = plticker.MultipleLocator(base=1, offset=0.5); ax.xaxis.set_major_locator(locx); 
 locy = plticker.MultipleLocator(base=8, offset=-0.5); ax.yaxis.set_major_locator(locy); 
@@ -109,8 +126,8 @@ plt.savefig(f'accuracies.png')
 fig, ax = plt.subplots(figsize=(10,7))
 map = ax.pcolor(sizes)
 ax.set_title('Number of Parameters')
-ax.set_xlabel('Number of Nodes')
-ax.set_ylabel('Number of Layers')
+ax.set_xlabel('Number of Layers')
+ax.set_ylabel('Number of Nodes')
 
 locx = plticker.MultipleLocator(base=1, offset=0.5); ax.xaxis.set_major_locator(locx); 
 locy = plticker.MultipleLocator(base=8, offset=-0.5); ax.yaxis.set_major_locator(locy); 
@@ -121,5 +138,23 @@ max_acc = np.max(sizes)
 cbar = fig.colorbar(map, ax=ax)
 
 plt.savefig(f'modelsizes.png')
+
+fig, ax = plt.subplots(figsize=(10,7))
+map = ax.pcolor(ztest)
+ax.set_title('Number of Parameters')
+ax.set_xlabel('Number of Layers')
+ax.set_ylabel('Number of Nodes')
+
+locx = plticker.MultipleLocator(base=1, offset=0.5); ax.xaxis.set_major_locator(locx); 
+locy = plticker.MultipleLocator(base=8, offset=-0.5); ax.yaxis.set_major_locator(locy); 
+f = lambda x, _: int(x + 0.5); ax.xaxis.set_major_formatter(plticker.FuncFormatter(f)); ax.yaxis.set_major_formatter(plticker.FuncFormatter(f))
+
+max_acc = np.max(ztest)
+
+cbar = fig.colorbar(map, ax=ax)
+
+plt.savefig(f'overfitting.png')
+
+
 
 print(f'Done in {program_end-program_start} s')
