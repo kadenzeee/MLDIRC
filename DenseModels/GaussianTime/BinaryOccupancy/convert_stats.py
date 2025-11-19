@@ -50,6 +50,8 @@ while t.next() and t.i() < entries:
     t0    = np.min(times)
     t1    = np.max(times)
 
+    
+
     chind = np.zeros(nchan)
     chind[chs] += 1
 

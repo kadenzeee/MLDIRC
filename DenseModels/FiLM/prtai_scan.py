@@ -2,12 +2,10 @@ import tensorflow as tf
 from tensorflow import keras
 import matplotlib.pyplot as plt
 import matplotlib.ticker as plticker
-import time
 import numpy as np
 import sys
 
 
-program_start = time.time()
 
 infile = "22TO90DEG.npz"
 
@@ -222,54 +220,3 @@ print(ztest)
 
 np.savez(f"results{infile}", heatmap=heatmap, sizes=sizes, ztest=ztest)
 
-fig, ax = plt.subplots(figsize=(10,7))
-map = ax.pcolor(heatmap, vmin=0.5, vmax=1)
-ax.set_xlabel('Number of Layers')
-ax.set_ylabel('Number of Nodes')
-
-locx = plticker.MultipleLocator(base=1, offset=0.5); ax.xaxis.set_major_locator(locx); 
-locy = plticker.MultipleLocator(base=8, offset=-0.5); ax.yaxis.set_major_locator(locy); 
-f = lambda x, _: int(x + 0.5); ax.xaxis.set_major_formatter(plticker.FuncFormatter(f)); ax.yaxis.set_major_formatter(plticker.FuncFormatter(f))
-
-traditional_acc = 0.86
-max_acc = np.max(heatmap)
-
-cbar = fig.colorbar(map, ax=ax)
-cbar.ax.hlines(traditional_acc, 0, 1, colors='k', linestyles='-', linewidth=1)
-cbar.ax.text(2, traditional_acc, 'Time Imaging', va='center', ha='left', fontsize=8, transform=cbar.ax.transData)
-cbar.ax.hlines(max_acc, 0, 1, colors='k', linestyles='-', linewidth=1)
-cbar.ax.text(2, max_acc, 'DNN', va='center', ha='left', fontsize=8, transform=cbar.ax.transData)
-
-plt.savefig(f'accuracies.png')
-
-fig, ax = plt.subplots(figsize=(10,7))
-map = ax.pcolor(sizes)
-ax.set_title('Number of Parameters')
-ax.set_xlabel('Number of Layers')
-ax.set_ylabel('Number of Nodes')
-
-locx = plticker.MultipleLocator(base=1, offset=0.5); ax.xaxis.set_major_locator(locx); 
-locy = plticker.MultipleLocator(base=8, offset=-0.5); ax.yaxis.set_major_locator(locy); 
-f = lambda x, _: int(x + 0.5); ax.xaxis.set_major_formatter(plticker.FuncFormatter(f)); ax.yaxis.set_major_formatter(plticker.FuncFormatter(f))
-
-max_acc = np.max(sizes)
-
-cbar = fig.colorbar(map, ax=ax)
-
-plt.savefig(f'modelsizes.png')
-
-fig, ax = plt.subplots(figsize=(10,7))
-map = ax.pcolor(ztest)
-ax.set_title('Number of Parameters')
-ax.set_xlabel('Number of Layers')
-ax.set_ylabel('Number of Nodes')
-
-locx = plticker.MultipleLocator(base=1, offset=0.5); ax.xaxis.set_major_locator(locx); 
-locy = plticker.MultipleLocator(base=8, offset=-0.5); ax.yaxis.set_major_locator(locy); 
-f = lambda x, _: int(x + 0.5); ax.xaxis.set_major_formatter(plticker.FuncFormatter(f)); ax.yaxis.set_major_formatter(plticker.FuncFormatter(f))
-
-max_acc = np.max(ztest)
-
-cbar = fig.colorbar(map, ax=ax)
-
-plt.savefig(f'overfitting.png')

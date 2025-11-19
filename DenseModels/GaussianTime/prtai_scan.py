@@ -7,11 +7,13 @@ import matplotlib.ticker as plticker
 
 program_start = time.time()
 
-infile = "80DEG.npz"
+infile = "BinaryOccupancy/80DEG.npz"
 
 with np.load(infile) as f:
     TIMES, LABELS = f["TIMES"], f["LABELS"]
     nevents = TIMES.shape[0]
+
+print(TIMES[0])
 
 # ---------------------------------------------------------------
 #
