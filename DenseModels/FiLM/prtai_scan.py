@@ -7,7 +7,7 @@ import sys
 
 
 
-infile = "22TO90DEG.npz"
+infile = "8K22TO90DEG.npz"
 
 f = np.load(infile, mmap_mode='r')
 TIMES, ANGLES, LABELS = f["TIMES"], f["ANGLES"], f["LABELS"]
@@ -137,7 +137,7 @@ val_gen     = SparseBatchGenerator(valtimes, valangles, vallabels, batch_size=ba
 test_gen    = SparseBatchGenerator(testtimes, testangles, testlabels, batch_size=batch_size, shuffle=True)
 
 
-search = (4, 2)
+search = (8, 5)
 heatmap = np.zeros((search[0], search[-1]))
 sizes = np.zeros((search[0], search[-1]))
 ztest = np.zeros((search[0], search[-1]))
@@ -146,7 +146,7 @@ for i in range(0, search[0]):
     for j in range(0, search[-1]):
         
         # Number of nodes in time/angle branches and FiLM layers
-        num_nodes = i + 1       # 1, 2, 3, ... nodes
+        num_nodes = 8 *(i + 1)       # 1, 2, 3, ... nodes
         num_layers = j + 1       # 1, 2, 3, ... layers
         
         # Time Data Branch (with variable layers)
@@ -182,13 +182,14 @@ for i in range(0, search[0]):
             metrics=['accuracy']
         )
 
+        model.summary()
         modelsize = sum(np.prod(w.shape) for w in model.trainable_weights)
 
         history = model.fit(
             train_gen,
             validation_data=val_gen,
             epochs=nepochs,
-            verbose=0,  # quiet to avoid spam during scan
+            verbose=2,  # quiet to avoid spam during scan
         )
         history_dict = history.history
 
