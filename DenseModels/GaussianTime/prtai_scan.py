@@ -72,7 +72,7 @@ for i in range(0, search[0]):
             [tf.keras.layers.Dense(numclasses)]
             )
 
-        modelsize = sum(np.prod(w.shape) for w in model.trainable_weights)
+        
 
 
         model.compile(optimizer='adam',

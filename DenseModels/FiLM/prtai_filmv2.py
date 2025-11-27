@@ -1,3 +1,6 @@
+# wayyyyy too slow. just ignore this file :O
+
+
 import tensorflow as tf
 from tensorflow import keras
 from scipy import sparse
@@ -10,12 +13,14 @@ import sys
 
 program_start = time.time()
 
-infile = "8K22TO90DEG.npz"
+infile = "8K22TO90DEGv2.npz"
 
 f = np.load(infile, mmap_mode='r')
 TIMES, ANGLES, LABELS = f["TIMES"], f["ANGLES"], f["LABELS"]
 nevents = TIMES.shape[0]
-input_dim = TIMES.shape[1]
+nchan   = TIMES.shape[1]
+
+print(TIMES.shape)
 
 print(f"Data size: {sys.getsizeof(TIMES)//10**6} MB")
 
@@ -28,31 +33,28 @@ class_names = ['Pi+', 'Proton']
 num_classes = len(class_names) # Pions or kaons?
 
 
-batch_size  = 128 # How many events to feed to NN at a time?
-nepochs     = 40 # How many epochs?
+batch_size  = 256 # How many events to feed to NN at a time?
+nepochs     = 30 # How many epochs?
 
 trainfrac   = 0.75
 valfrac     = 0.1
 testfrac    = 0.15
 # ---------------------------------------------------------------
 
-perm = np.random.permutation(nevents)
-TIMES_shuf  = TIMES[perm]
-ANGLES_shuf = ANGLES[perm]
-LABELS_shuf = LABELS[perm]
+
 
 trainend    = int(np.floor(nevents * trainfrac))
 valend      = int(trainend + np.floor(nevents * valfrac))
 
-traintimes  = TIMES_shuf[:trainend]
-trainangles = ANGLES_shuf[:trainend]
-trainlabels = LABELS_shuf[:trainend]
-valtimes    = TIMES_shuf[trainend:valend]
-valangles   = ANGLES_shuf[trainend:valend]
-vallabels   = LABELS_shuf[trainend:valend]
-testtimes   = TIMES_shuf[valend:]
-testangles  = ANGLES_shuf[valend:]
-testlabels  = LABELS_shuf[valend:]
+traintimes  = TIMES[:trainend]
+trainangles = ANGLES[:trainend]
+trainlabels = LABELS[:trainend]
+valtimes    = TIMES[trainend:valend]
+valangles   = ANGLES[trainend:valend]
+vallabels   = LABELS[trainend:valend]
+testtimes   = TIMES[valend:]
+testangles  = ANGLES[valend:]
+testlabels  = LABELS[valend:]
 
 class ScheduledFiLM(keras.layers.Layer):
     def __init__(self, **kwargs):
@@ -81,17 +83,17 @@ class ScheduledFiLMCallback(keras.callbacks.Callback):
 
 
 
-class SparseBatchGenerator(keras.utils.Sequence):
+class BatchGenerator(keras.utils.Sequence):
     """
-    Converts sparse matrices to dense batches for training during runtime. Full sparse dataset is loaded into memory, and dense batches are created using this class.
+    Converts to dense batches for training during runtime. 
     Class keeps ordering and supports shuffling each epoch.
 
     
     Parameters
     ----------
-    *args : ndarray, sparseMatrix, awkwardArray 
-        Sparse or dense matrices to be placed into batches. The arguments should include label data as the last argument.
-    >>> train_gen = SparseBatchGenerator(times, angles, labels, \*kwargs)
+    *args : ndarray
+        Matrices to be placed into batches. The arguments should include label data as the last argument.
+    >>> train_gen = SparseBatchGenerator(times, angles, labels, *kwargs)
     batch_size : int
         Number of matrices to batch.
     shuffle : bool
@@ -136,31 +138,50 @@ class SparseBatchGenerator(keras.utils.Sequence):
 
 num_nodes = 80
 
-# Time Data Branch
-hist_input = keras.Input(shape=(input_dim,))
+# Histogram Data Branch ---------------------------------
 
+hist_input = keras.Input(shape=(nchan, 2), name="Hist Input")
+
+# Map channel ID to an 8D vector
+chids = keras.ops.transpose(hist_input)[0]
+
+tbins = keras.ops.transpose(hist_input)[1, :]
+tbins = keras.ops.expand_dims(tbins, axis=-1)
+
+embed = keras.layers.Embedding(input_dim=nchan, output_dim=8)(chids)
+
+h = keras.layers.Concatenate(axis=-1)([embed, tbins])
+h = keras.layers.Conv1D(filters=32, kernel_size=3, activation='relu')(h)
+h = keras.layers.GlobalMaxPooling1D()(h)
+
+
+h = keras.layers.Dense(num_nodes, activation='relu')(hist_input)
 h = keras.layers.Dropout(0.15)(hist_input)
 h = keras.layers.Dense(num_nodes, activation='relu')(h)
-h = keras.layers.Dense(num_nodes, activation='relu')(h)
+
+# -------------------------------------------------------
 
 
-# Angle Data Branch
-angle_input = keras.Input(shape=(7,))
+# Angle Data Branch -------------------------------------
+angle_input = keras.Input(shape=(7,), name="Angle Input")
 a = keras.layers.Dense(num_nodes, activation='relu')(angle_input)
 a = keras.layers.Dense(num_nodes, activation='relu')(a)
+
+# -------------------------------------------------------
 
 # Produce FiLM parameters
 gamma = keras.layers.Dense(num_nodes, activation='linear', name='gamma')(a)
 beta  = keras.layers.Dense(num_nodes, activation='linear', name='beta')(a)
-#gamma = keras.layers.Lambda(lambda g: 1.0 + 1.5*g)(gamma)
-#beta  = keras.layers.Lambda(lambda b: 1.5*b)(beta)
+gamma = keras.layers.Lambda(lambda g: 1.0 + 1.5*g)(gamma)
+beta  = keras.layers.Lambda(lambda b: 1.5*b)(beta)
 
 # FiLM layer
 h_mod = keras.layers.Multiply()([h, gamma])
 h_mod = keras.layers.Add()([h_mod, beta])
+h_mod = keras.layers.GlobalMaxPooling1D()(h_mod)
 
 # Combined layers and output
-x = keras.layers.Dense(16, activation='relu')(h_mod)
+x = keras.layers.Dense(num_nodes // 4, activation='relu')(h_mod)
 out = keras.layers.Dense(num_classes, activation='softmax', name='output')(x)
 
 model = keras.Model(inputs=[hist_input, angle_input], outputs=out)
@@ -175,9 +196,9 @@ model.summary()
 
 film = ScheduledFiLM()
 
-train_gen   = SparseBatchGenerator(traintimes, trainangles, trainlabels, batch_size=batch_size, shuffle=True)
-val_gen     = SparseBatchGenerator(valtimes, valangles, vallabels, batch_size=batch_size, shuffle=True)
-test_gen    = SparseBatchGenerator(testtimes, testangles, testlabels, batch_size=batch_size, shuffle=True)
+train_gen   = BatchGenerator(traintimes, trainangles, trainlabels, batch_size=batch_size, shuffle=True)
+val_gen     = BatchGenerator(valtimes, valangles, vallabels, batch_size=batch_size, shuffle=True)
+test_gen    = BatchGenerator(testtimes, testangles, testlabels, batch_size=batch_size, shuffle=True)
 
 
 
@@ -194,4 +215,3 @@ test_loss, test_acc = model.evaluate(
 
 print('\nTest accuracy:', test_acc)
 print('Test loss:', test_loss)
-    

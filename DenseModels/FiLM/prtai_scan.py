@@ -137,7 +137,7 @@ val_gen     = SparseBatchGenerator(valtimes, valangles, vallabels, batch_size=ba
 test_gen    = SparseBatchGenerator(testtimes, testangles, testlabels, batch_size=batch_size, shuffle=True)
 
 
-search = (8, 5)
+search = (12, 5)
 heatmap = np.zeros((search[0], search[-1]))
 sizes = np.zeros((search[0], search[-1]))
 ztest = np.zeros((search[0], search[-1]))
@@ -146,7 +146,7 @@ for i in range(0, search[0]):
     for j in range(0, search[-1]):
         
         # Number of nodes in time/angle branches and FiLM layers
-        num_nodes = 8 *(i + 1)       # 1, 2, 3, ... nodes
+        num_nodes = 8 * (i + 1)       # 8, 16, 24, ... nodes
         num_layers = j + 1       # 1, 2, 3, ... layers
         
         # Time Data Branch (with variable layers)
