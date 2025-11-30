@@ -1,11 +1,10 @@
+#!/usr/bin/env python3
+
 import tensorflow as tf
 from tensorflow import keras
-from scipy import sparse
-import awkward as ak
 import time
 import numpy as np
 import sys
-
 
 
 program_start = time.time()
@@ -194,4 +193,5 @@ test_loss, test_acc = model.evaluate(
 
 print('\nTest accuracy:', test_acc)
 print('Test loss:', test_loss)
-    
+program_end = time.time()
+print(f"Done in {program_end - program_start}s")
