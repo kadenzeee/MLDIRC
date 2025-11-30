@@ -8,11 +8,11 @@ import numpy as np
 import sys
 import os
 
-
-os.environ['MIOPEN_ENABLE_LOGGING'] = f'{1 if self.rocm_logging_level > 0 else 0}'
-os.environ['MIOPEN_ENABLE_LOGGING_CMD'] = f'{1 if self.rocm_logging_level > 0 else 0}'
-os.environ['MIOPEN_LOG_LEVEL'] = f'{self.rocm_logging_level}'
-os.environ['TF_CPP_MAX_VLOG_LEVEL'] = f'{self.rocm_logging_level}'
+tf.rocm_logging_level = -1
+os.environ['MIOPEN_ENABLE_LOGGING'] = f'{1 if tf.rocm_logging_level > 0 else 0}'
+os.environ['MIOPEN_ENABLE_LOGGING_CMD'] = f'{1 if tf.rocm_logging_level > 0 else 0}'
+os.environ['MIOPEN_LOG_LEVEL'] = f'{tf.rocm_logging_level}'
+os.environ['TF_CPP_MAX_VLOG_LEVEL'] = f'{tf.rocm_logging_level}'
 
 program_start = time.time()
 
@@ -97,7 +97,7 @@ class SparseBatchGenerator(keras.utils.Sequence):
     ----------
     *args : ndarray, sparseMatrix, awkwardArray 
         Sparse or dense matrices to be placed into batches. The arguments should include label data as the last argument.
-    >>> train_gen = SparseBatchGenerator(times, angles, labels, \*kwargs)
+    >>> train_gen = SparseBatchGenerator(times, angles, labels, *kwargs)
     batch_size : int
         Number of matrices to batch.
     shuffle : bool
