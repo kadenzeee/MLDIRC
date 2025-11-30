@@ -8,11 +8,13 @@ import numpy as np
 import sys
 import os
 
-tf.rocm_logging_level = -1
-os.environ['MIOPEN_ENABLE_LOGGING'] = f'{1 if tf.rocm_logging_level > 0 else 0}'
-os.environ['MIOPEN_ENABLE_LOGGING_CMD'] = f'{1 if tf.rocm_logging_level > 0 else 0}'
-os.environ['MIOPEN_LOG_LEVEL'] = f'{tf.rocm_logging_level}'
-os.environ['TF_CPP_MAX_VLOG_LEVEL'] = f'{tf.rocm_logging_level}'
+tf.keras.mixed_precision.set_global_policy('mixed_bfloat16')
+
+os.environ["ROBCLAS_VERBOSE"] = "0"
+os.environ["ROCM_INFO_LEVEL"] = "0"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+
+print(f"[INFO] Environment set")
 
 program_start = time.time()
 
@@ -23,7 +25,7 @@ TIMES, ANGLES, LABELS = f["TIMES"], f["ANGLES"], f["LABELS"]
 nevents = TIMES.shape[0]
 input_dim = TIMES.shape[1]
 
-print(f"Data size: {sys.getsizeof(TIMES)//10**6} MB")
+print(f"[INFO] Data size: {sys.getsizeof(TIMES)//10**6} MB")
 
 # ---------------------------------------------------------------
 #
