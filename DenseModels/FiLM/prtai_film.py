@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 
+
 import tensorflow as tf
 from tensorflow import keras
 import time
 import numpy as np
 import sys
+import os
 
+
+os.environ['MIOPEN_ENABLE_LOGGING'] = f'{1 if self.rocm_logging_level > 0 else 0}'
+os.environ['MIOPEN_ENABLE_LOGGING_CMD'] = f'{1 if self.rocm_logging_level > 0 else 0}'
+os.environ['MIOPEN_LOG_LEVEL'] = f'{self.rocm_logging_level}'
+os.environ['TF_CPP_MAX_VLOG_LEVEL'] = f'{self.rocm_logging_level}'
 
 program_start = time.time()
 
