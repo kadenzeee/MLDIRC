@@ -1,0 +1,217 @@
+# wayyyyy too slow. just ignore this file :O
+
+
+import tensorflow as tf
+from tensorflow import keras
+from scipy import sparse
+import awkward as ak
+import time
+import numpy as np
+import sys
+
+
+
+program_start = time.time()
+
+infile = "8K22TO90DEGv2.npz"
+
+f = np.load(infile, mmap_mode='r')
+TIMES, ANGLES, LABELS = f["TIMES"], f["ANGLES"], f["LABELS"]
+nevents = TIMES.shape[0]
+nchan   = TIMES.shape[1]
+
+print(TIMES.shape)
+
+print(f"Data size: {sys.getsizeof(TIMES)//10**6} MB")
+
+# ---------------------------------------------------------------
+#
+#                       PARAMETERS
+#
+# ---------------------------------------------------------------
+class_names = ['Pi+', 'Proton']
+num_classes = len(class_names) # Pions or kaons?
+
+
+batch_size  = 256 # How many events to feed to NN at a time?
+nepochs     = 30 # How many epochs?
+
+trainfrac   = 0.75
+valfrac     = 0.1
+testfrac    = 0.15
+# ---------------------------------------------------------------
+
+
+
+trainend    = int(np.floor(nevents * trainfrac))
+valend      = int(trainend + np.floor(nevents * valfrac))
+
+traintimes  = TIMES[:trainend]
+trainangles = ANGLES[:trainend]
+trainlabels = LABELS[:trainend]
+valtimes    = TIMES[trainend:valend]
+valangles   = ANGLES[trainend:valend]
+vallabels   = LABELS[trainend:valend]
+testtimes   = TIMES[valend:]
+testangles  = ANGLES[valend:]
+testlabels  = LABELS[valend:]
+
+class ScheduledFiLM(keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super(ScheduledFiLM, self).__init__(**kwargs)
+        self.lambda_var = tf.Variable(0.0, trainable=False, dtype=tf.float32)
+        self.ranp_rate = 0.01
+        
+
+    def call(self, inputs):
+        x, gamma, beta = inputs
+        lam = tf.clip_by_value(self.lambda_var, 0.0, 1.0)
+        return (1.0 + lam * gamma) * x + lam * beta
+
+
+
+class ScheduledFiLMCallback(keras.callbacks.Callback):
+    def __init__(self, film_layer, nepochs):
+        super(ScheduledFiLMCallback, self).__init__()
+        self.film_layer = film_layer
+        self.nepochs = nepochs
+
+    def on_epoch_end(self, epoch, logs=None):
+        new_lambda = (2*epoch + self.nepochs) / (epoch + self.nepochs) - 0.5
+        self.film_layer.lambda_var.assign(new_lambda)
+        print(f'\nUpdated FiLM lambda to {new_lambda:.4f}')
+
+
+
+class BatchGenerator(keras.utils.Sequence):
+    """
+    Converts to dense batches for training during runtime. 
+    Class keeps ordering and supports shuffling each epoch.
+
+    
+    Parameters
+    ----------
+    *args : ndarray
+        Matrices to be placed into batches. The arguments should include label data as the last argument.
+    >>> train_gen = SparseBatchGenerator(times, angles, labels, *kwargs)
+    batch_size : int
+        Number of matrices to batch.
+    shuffle : bool
+        Whether or not to shuffle data on epoch end.
+    """
+
+    def __init__(self, *args, batch_size=256, shuffle=True):
+        self.args = args
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.n = self.args[0].shape[0]
+        self.indices = np.arange(self.n)
+        self.on_epoch_end()
+
+    def __len__(self):
+        return int(np.ceil(self.n / float(self.batch_size)))
+    
+    def __getitem__(self, idx):
+        batch_idx = self.indices[idx * self.batch_size:(idx + 1) * self.batch_size]
+        batch_list = []
+        
+        for data in self.args:
+            arr = np.asarray(data[batch_idx])
+            batch_list.append(arr)
+            
+        inputs = batch_list[:-1]
+        labels = batch_list[-1]
+
+
+        # keras needs a tuple of the inputs if there are multiple inputs, can't handle list of inputs. 
+        if len(inputs) == 1:
+            inputs = inputs[0]
+        else:
+            inputs = tuple(inputs)
+        
+        return inputs, labels
+    
+    def on_epoch_end(self):
+        if self.shuffle:
+            np.random.shuffle(self.indices)
+
+
+num_nodes = 80
+
+# Histogram Data Branch ---------------------------------
+
+hist_input = keras.Input(shape=(nchan, 2), name="Hist Input")
+
+# Map channel ID to an 8D vector
+chids = keras.ops.transpose(hist_input)[0]
+
+tbins = keras.ops.transpose(hist_input)[1, :]
+tbins = keras.ops.expand_dims(tbins, axis=-1)
+
+embed = keras.layers.Embedding(input_dim=nchan, output_dim=8)(chids)
+
+h = keras.layers.Concatenate(axis=-1)([embed, tbins])
+h = keras.layers.Conv1D(filters=32, kernel_size=3, activation='relu')(h)
+h = keras.layers.GlobalMaxPooling1D()(h)
+
+
+h = keras.layers.Dense(num_nodes, activation='relu')(hist_input)
+h = keras.layers.Dropout(0.15)(hist_input)
+h = keras.layers.Dense(num_nodes, activation='relu')(h)
+
+# -------------------------------------------------------
+
+
+# Angle Data Branch -------------------------------------
+angle_input = keras.Input(shape=(7,), name="Angle Input")
+a = keras.layers.Dense(num_nodes, activation='relu')(angle_input)
+a = keras.layers.Dense(num_nodes, activation='relu')(a)
+
+# -------------------------------------------------------
+
+# Produce FiLM parameters
+gamma = keras.layers.Dense(num_nodes, activation='linear', name='gamma')(a)
+beta  = keras.layers.Dense(num_nodes, activation='linear', name='beta')(a)
+gamma = keras.layers.Lambda(lambda g: 1.0 + 1.5*g)(gamma)
+beta  = keras.layers.Lambda(lambda b: 1.5*b)(beta)
+
+# FiLM layer
+h_mod = keras.layers.Multiply()([h, gamma])
+h_mod = keras.layers.Add()([h_mod, beta])
+h_mod = keras.layers.GlobalMaxPooling1D()(h_mod)
+
+# Combined layers and output
+x = keras.layers.Dense(num_nodes // 4, activation='relu')(h_mod)
+out = keras.layers.Dense(num_classes, activation='softmax', name='output')(x)
+
+model = keras.Model(inputs=[hist_input, angle_input], outputs=out)
+model.compile(
+    optimizer=keras.optimizers.Adam(),
+    loss=keras.losses.SparseCategoricalCrossentropy(),
+    metrics=['accuracy']
+)
+model.summary()
+
+
+
+film = ScheduledFiLM()
+
+train_gen   = BatchGenerator(traintimes, trainangles, trainlabels, batch_size=batch_size, shuffle=True)
+val_gen     = BatchGenerator(valtimes, valangles, vallabels, batch_size=batch_size, shuffle=True)
+test_gen    = BatchGenerator(testtimes, testangles, testlabels, batch_size=batch_size, shuffle=True)
+
+
+
+model.fit(
+    train_gen,
+    validation_data=val_gen,
+    epochs=nepochs, 
+    #callbacks=[ScheduledFiLMCallback(film, nepochs)],
+)
+
+test_loss, test_acc = model.evaluate(
+    test_gen, verbose=2
+)
+
+print('\nTest accuracy:', test_acc)
+print('Test loss:', test_loss)
