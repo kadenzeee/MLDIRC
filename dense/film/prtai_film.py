@@ -36,7 +36,7 @@ class_names = ['Pi+', 'Proton']
 num_classes = len(class_names) # Pions or kaons?
 
 
-batch_size  = 512 # How many events to feed to NN at a time?
+batch_size  = 128 # How many events to feed to NN at a time?
 nepochs     = 30 # How many epochs?
 
 trainfrac   = 0.75
@@ -119,23 +119,12 @@ class BatchGenerator(keras.utils.Sequence):
     
     def __getitem__(self, idx):
         batch_idx = self.indices[idx * self.batch_size:(idx + 1) * self.batch_size]
-        batch_list = []
+        batch_list = [np.asarray(data[batch_idx]) for data in self.args]
         
-        for data in self.args:
-            arr = np.asarray(data[batch_idx])
-            batch_list.append(arr)
-            
         inputs = batch_list[:-1]
         labels = batch_list[-1]
-
-
-        # keras needs a tuple of the inputs if there are multiple inputs, can't handle list of inputs. 
-        if len(inputs) == 1:
-            inputs = inputs[0]
-        else:
-            inputs = tuple(inputs)
         
-        return inputs, labels
+        return tuple(inputs), labels
     
     def on_epoch_end(self):
         if self.shuffle:
@@ -180,13 +169,9 @@ model.compile(
 model.summary()
 
 
-
-film = ScheduledFiLM()
-
 train_gen   = BatchGenerator(traintimes, trainangles, trainlabels, batch_size=batch_size, shuffle=True)
 val_gen     = BatchGenerator(valtimes, valangles, vallabels, batch_size=batch_size, shuffle=True)
 test_gen    = BatchGenerator(testtimes, testangles, testlabels, batch_size=batch_size, shuffle=True)
-
 
 
 model.fit(
