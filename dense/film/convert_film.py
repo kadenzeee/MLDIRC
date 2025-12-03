@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 import os
 import ROOT  # type: ignore ::: need to be in environment with ROOT installed and sourced
