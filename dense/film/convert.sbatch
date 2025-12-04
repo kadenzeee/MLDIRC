@@ -8,4 +8,6 @@
 
 source /lustre/nyx/panda/markhoff/geant
 
+export PATH=/lustre/nyx/panda/markhoff/local/python3.11/bin:$PATH
+
 python3 convert_film.py ../../../data/iahits.root
