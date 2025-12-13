@@ -4,9 +4,11 @@
 import tensorflow as tf
 from tensorflow import keras
 import time
+import datetime
 import numpy as np
 import sys
 import os
+import subprocess
 
 tf.keras.mixed_precision.set_global_policy('mixed_bfloat16')
 
@@ -18,7 +20,7 @@ print(f"[INFO] Environment set")
 
 program_start = time.time()
 
-infile = "8K22TO90DEG.npz"
+infile = "iahits2.npz"
 
 f = np.load(infile, mmap_mode='r')
 TIMES, ANGLES, LABELS = f["TIMES"], f["ANGLES"], f["LABELS"]
@@ -26,6 +28,7 @@ nevents = TIMES.shape[0]
 input_dim = TIMES.shape[1]
 
 print(f"[INFO] Data size: {sys.getsizeof(TIMES)//10**6} MB")
+
 
 # ---------------------------------------------------------------
 #
@@ -36,31 +39,36 @@ class_names = ['Pi+', 'Proton']
 num_classes = len(class_names) # Pions or kaons?
 
 
-batch_size  = 128 # How many events to feed to NN at a time?
-nepochs     = 30 # How many epochs?
+batch_size  = 256 # How many events to feed to NN at a time?
+nepochs     = 20 # How many epochs?
 
-trainfrac   = 0.75
-valfrac     = 0.1
+trainfrac   = 0.7
+valfrac     = 0.15
 testfrac    = 0.15
+
+datafrac    = 1  # What fraction of data to use?
 # ---------------------------------------------------------------
 
-perm = np.random.permutation(nevents)
-TIMES_shuf  = TIMES[perm]
-ANGLES_shuf = ANGLES[perm]
-LABELS_shuf = LABELS[perm]
+trainfrac, valfrac, testfrac = (datafrac*trainfrac, datafrac*valfrac, datafrac*testfrac)
 
 trainend    = int(np.floor(nevents * trainfrac))
 valend      = int(trainend + np.floor(nevents * valfrac))
+testend     = int(valend + np.floor(nevents * testfrac))
 
-traintimes  = TIMES_shuf[:trainend]
-trainangles = ANGLES_shuf[:trainend]
-trainlabels = LABELS_shuf[:trainend]
-valtimes    = TIMES_shuf[trainend:valend]
-valangles   = ANGLES_shuf[trainend:valend]
-vallabels   = LABELS_shuf[trainend:valend]
-testtimes   = TIMES_shuf[valend:]
-testangles  = ANGLES_shuf[valend:]
-testlabels  = LABELS_shuf[valend:]
+print(f"[INFO] Using {testend} out of {nevents} available events")
+
+traintimes  = TIMES[:trainend]
+trainangles = ANGLES[:trainend]
+trainlabels = LABELS[:trainend]
+valtimes    = TIMES[trainend:valend]
+valangles   = ANGLES[trainend:valend]
+vallabels   = LABELS[trainend:valend]
+testtimes   = TIMES[valend:testend]
+testangles  = ANGLES[valend:testend]
+testlabels  = LABELS[valend:testend]
+
+
+
 
 class ScheduledFiLM(keras.layers.Layer):
     def __init__(self, **kwargs):
@@ -131,33 +139,62 @@ class BatchGenerator(keras.utils.Sequence):
             np.random.shuffle(self.indices)
 
 
-num_nodes = 80
+num_nodes = 96
+dropout = 0.15
 
 # Time Data Branch
 hist_input = keras.Input(shape=(input_dim,))
-
-h = keras.layers.Dropout(0.15)(hist_input)
-h = keras.layers.Dense(num_nodes, activation='relu')(h)
-h = keras.layers.Dense(num_nodes, activation='relu')(h)
+h = keras.layers.Dense(num_nodes, activation='gelu')(hist_input)
+h = keras.layers.Dropout(dropout)(h)
 
 
 # Angle Data Branch
+@keras.utils.register_keras_serializable(package='Custom', name='ScaleAngles')
+class ScaleAngles(keras.layers.Layer):
+    def __init__(self, initial_scale=1.0, dtype='bfloat16', **kwargs):
+        super().__init__(**kwargs)
+        self.initial_scale = initial_scale
+        self._dtype = dtype
+
+    def build(self, input_shape):
+        # trainable scalar weight tracked by the layer
+        self.scale = self.add_weight(
+            name='scale',
+            shape=(),
+            initializer=tf.keras.initializers.Constant(self.initial_scale),
+            trainable=True,
+            dtype=self._dtype
+        )
+
+    def call(self, x):
+        # ensure same dtype for multiplication
+        s = tf.cast(self.scale, x.dtype)
+        angle = x[:, 4:] * s
+        rest = x[:, :4]
+        return tf.concat([angle, rest], axis=1)
+
+    def get_config(self):
+        cfg = super().get_config()
+        cfg.update({'initial_scale': self.initial_scale, 'dtype': self._dtype})
+        return cfg
+
 angle_input = keras.Input(shape=(7,))
-a = keras.layers.Dense(num_nodes, activation='relu')(angle_input)
-a = keras.layers.Dense(num_nodes, activation='relu')(a)
+scaled_input = ScaleAngles(initial_scale=1.0, dtype='bfloat16')(angle_input)
+
+a = keras.layers.Dense(num_nodes, activation='gelu')(scaled_input)
 
 # Produce FiLM parameters
 gamma = keras.layers.Dense(num_nodes, activation='linear', name='gamma')(a)
 beta  = keras.layers.Dense(num_nodes, activation='linear', name='beta')(a)
-#gamma = keras.layers.Lambda(lambda g: 1.0 + 1.5*g)(gamma)
-#beta  = keras.layers.Lambda(lambda b: 1.5*b)(beta)
+#gamma = keras.layers.Lambda(lambda g: 1.0 + 10*g)(gamma)
+#beta  = keras.layers.Lambda(lambda b: 10*b)(beta)
 
 # FiLM layer
 h_mod = keras.layers.Multiply()([h, gamma])
 h_mod = keras.layers.Add()([h_mod, beta])
 
 # Combined layers and output
-x = keras.layers.Dense(16, activation='relu')(h_mod)
+x = keras.layers.Dense(16, activation='gelu')(h_mod)
 out = keras.layers.Dense(num_classes, activation='softmax', name='output')(x)
 
 model = keras.Model(inputs=[hist_input, angle_input], outputs=out)
@@ -187,5 +224,18 @@ test_loss, test_acc = model.evaluate(
 
 print('\nTest accuracy:', test_acc)
 print('Test loss:', test_loss)
+
+subprocess.run('mkdir models', shell=True)
+date_str = datetime.date.today().isoformat()
+i = 1
+while True:
+    out_name = f"models/{date_str}_model{i}.keras"
+    if not os.path.exists(out_name):
+        break
+    i += 1
+
+model.save(out_name)
+print(f"Saved model to {out_name}")
+
 program_end = time.time()
 print(f"Done in {program_end - program_start}s")

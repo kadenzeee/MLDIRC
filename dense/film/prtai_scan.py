@@ -1,13 +1,11 @@
 import tensorflow as tf
 from tensorflow import keras
-import matplotlib.pyplot as plt
-import matplotlib.ticker as plticker
 import numpy as np
 import sys
 
 
 
-infile = "8K22TO90DEG.npz"
+infile = "8K22TO90DEGnormstat.npz"
 
 f = np.load(infile, mmap_mode='r')
 TIMES, ANGLES, LABELS = f["TIMES"], f["ANGLES"], f["LABELS"]
@@ -28,8 +26,8 @@ num_classes = len(class_names) # Pions or kaons?
 batch_size  = 128 # How many events to feed to NN at a time?
 nepochs     = 10 # How many epochs?
 
-trainfrac   = 0.8
-valfrac     = 0.1
+trainfrac   = 0.7
+valfrac     = 0.15
 testfrac    = 0.15
 # ---------------------------------------------------------------
 

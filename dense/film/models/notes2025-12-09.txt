@@ -1,0 +1,15 @@
+I fixed my degrees to radians issue in my convert file macros.
+What a blunder.
+
+
+# ----------------------------------
+
+10 epochs, 128 batch size
+
+• Regenerated dataset, with correct angular info; 63.8%
+• Regenerated dataset, with zero angle info; 63.3%
+• Regenerated dataset, with zero stat info; 53.8%
+
+# ----------------------------------
+
+Tried new normalisation of stat info, by preprocessing z-scores of all stat features; 65.7%

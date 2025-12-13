@@ -1,0 +1,32 @@
+# ----------------------------
+#
+#           MODEL 1
+#
+# ----------------------------
+
+• batch; 128, nepoch; 15
+• numnodes; 96, numlayers; 3
+• Trained on 3M dataset
+• 54.5%
+
+# ----------------------------
+#
+#           MODEL 2
+#
+# ----------------------------
+
+• batch; 1024, nepoch; 10
+• numnodes; 96, numlayers; 3
+• Trained on 3M dataset
+• 52.9%
+
+# ----------------------------
+#
+#           MODEL 3
+#
+# ----------------------------
+
+• batch; 128, nepoch; 10
+• numnodes; 96, numlayers; 2
+• Trained on 3M dataset
+• Increase FiLM layer strength 10x

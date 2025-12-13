@@ -1,0 +1,25 @@
+# ----------------------------
+#
+#           MODEL 1
+#
+# ----------------------------
+
+• Trained on full Fisher-Yates 8K22TO90DEG dataset.
+• 0.8548 test accuracy.
+• Equivalent to 2.08σ at 7 GeV/c π/p separation.
+• Restricted phase space.
+• 8,000 events per angle, uniformly distributed.
+• 269.26 KB model size.
+
+# ----------------------------
+#
+#           MODEL 2
+#
+# ----------------------------
+
+• Trained on partial (47.78%) Fisher-Yates 3M22TO140DEG dataset. Chosen to maintain the events per angle.
+• 0.7079 test accuracy.
+• Equivalent to 0.96σ at 7 GeV/c π/p separation.
+• Full phase space.
+• ~8,000 events per angle, assume uniformly distributed.
+• 269.26 KB model size.

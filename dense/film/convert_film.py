@@ -6,12 +6,18 @@ import ROOT  # type: ignore ::: need to be in environment with ROOT installed an
 import numpy as np
 import time
 
+SHUFFLE = True
+
 program_start = time.time()
 
 ROOT.gInterpreter.ProcessLine('#include "../../../prttools/PrtTools.h"')
-ROOT.gSystem.Load("../../../prtdirc/build/libPrt.dylib")
 
-infile = "../../../Data/Raw/8K22TO90DEG.root"
+try:
+    ROOT.gSystem.Load("../../../prtdirc/build/libPrt.dylib")
+except FileNotFoundError():
+    ROOT.gSystem.Load("../../../prtdirc/build/libPrt.so")
+
+infile = "../../../Data/Raw/500K22TO90DEG.root"
 if(len(sys.argv) > 1):
     infile = sys.argv[1] 
 
@@ -19,21 +25,6 @@ t = ROOT.PrtTools(infile)
 entries = t.entries()
 nchan = t.npix() * t.npmt()
 
-# -------------------------------------
-#
-#               SPLITS
-#
-# -------------------------------------
-
-trainfrac  = 0.7
-valfrac    = 0.15
-testfrac   = 0.15
-
-# -------------------------------------
-
-
-trainend = int(np.floor(entries*trainfrac))
-valend   = int(trainend + np.floor(entries*valfrac))
 
 TIMES  = np.zeros((entries, nchan))
 ANGLES = np.zeros((entries, 7))
@@ -48,8 +39,8 @@ while t.next() and t.i() < entries:
 
     times = [photon.getLeadTime() + ROOT.gRandom.Gaus(0, 0.2) for photon in t.event().getHits()]
     chs   = [int(photon.getChannel()) for photon in t.event().getHits()]
-    theta = t.event().getTof()
-    phi   = t.event().getTofP()
+    theta = (t.event().getTof() + ROOT.gRandom.Gaus(0, 3E-03)) 
+    phi   = (t.event().getTofP() + ROOT.gRandom.Gaus(0, 3E-03))
 
     mu    = np.mean(times)
     std   = np.std(times)
@@ -64,13 +55,24 @@ while t.next() and t.i() < entries:
     LABELS[i] = t.pid()/2 - 1
 
 
-shuffle = np.random.permutation(entries)
+ANGLES.T[0] = (ANGLES.T[0] - np.mean(ANGLES.T[0]))/np.std(ANGLES.T[0])
+ANGLES.T[1] = (ANGLES.T[1] - np.mean(ANGLES.T[1]))/np.std(ANGLES.T[1])
+ANGLES.T[2] = (ANGLES.T[2] - np.mean(ANGLES.T[2]))/np.std(ANGLES.T[2])
+ANGLES.T[3] = (ANGLES.T[3] - np.mean(ANGLES.T[3]))/np.std(ANGLES.T[3])
 
-TIMES  = TIMES[shuffle]
-ANGLES = ANGLES[shuffle]
-LABELS = LABELS[shuffle]
 
-outfile = infile.replace(".root", "")
+print('[INFO] Shuffling...')
+
+if SHUFFLE:
+    shuffle = np.random.permutation(entries)
+
+    TIMES  = TIMES[shuffle]
+    ANGLES = ANGLES[shuffle]
+    LABELS = LABELS[shuffle]
+
+print('[INFO] Saving...')
+
+outfile = infile.replace(".root", "broken_angles")
 outfile = os.path.basename(outfile)
 np.savez_compressed(outfile, TIMES=TIMES, ANGLES=ANGLES, LABELS=LABELS)
 

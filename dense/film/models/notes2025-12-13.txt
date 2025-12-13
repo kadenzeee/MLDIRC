@@ -1,0 +1,19 @@
+# ------------------------------------
+#
+#                Model 1
+#
+# ------------------------------------
+
+• 40 to 80 dataset
+• kinda shit?
+• still displays proportionately better behaviour at lower angles
+• if evaluated on 22 to 90 dataset, will spike massively at 40.
+
+# ------------------------------------
+#
+#                Model 2
+#
+# ------------------------------------
+
+• 22 to 90 dataset
+• definitely still shit
